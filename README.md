@@ -18,7 +18,9 @@ Tiene una ventana hecha con **tkinter** y también un menú para usarlo desde la
 - Python 3
 - yt-dlp: `pip install yt-dlp`
 - [ffmpeg](https://ffmpeg.org/download.html) instalado (en el PATH o en `C:\ffmpeg\bin`)
-- (Recomendado) [deno](https://deno.com/): yt-dlp lo usa para resolver los retos de YouTube
+- (Recomendado) [deno](https://deno.com/) y yt-dlp-ejs: yt-dlp los usa para resolver los retos de YouTube
+  - `winget install DenoLand.Deno`
+  - `pip install yt-dlp-ejs`
 
 ## Uso
 
@@ -40,9 +42,9 @@ python main.py
 Para tener el programa en un solo archivo y abrirlo con doble clic:
 ```
 pip install pyinstaller
-python -m PyInstaller --onefile --windowed --name "Descargador de YT" --noconfirm interfaz.py
+python -m PyInstaller --onefile --windowed --name "Descargador de YT" --collect-all yt_dlp_ejs --noconfirm interfaz.py
 ```
-El .exe queda en la carpeta `dist`. Igual necesita ffmpeg instalado en la computadora.
+El .exe queda en la carpeta `dist`. Igual necesita ffmpeg (y deno, recomendado) instalados en la computadora.
 
 ## Archivos
 - `descargador.py`: la lógica de descarga (yt-dlp + ffmpeg)
