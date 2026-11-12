@@ -3,8 +3,25 @@
 # Usa las funciones de descargador.py
 
 import tkinter as tk
-from tkinter import ttk, filedialog
-from descargador import obtener_info, CARPETA_POR_DEFECTO
+from tkinter import ttk, filedialog, messagebox
+import threading
+from descargador import obtener_info, descargar, CARPETA_POR_DEFECTO
+
+
+# Aqui el hilo de la descarga va dejando como va todo.
+# La ventana lo revisa cada rato con revisar_progreso().
+# (tkinter se puede trabar si lo tocas desde otro hilo, por eso lo hacemos asi)
+estado = {
+    "descargando": False,
+    "porcentaje": 0,
+    "texto": "",
+    "terminado": False,
+    "resultado": False,
+    "mensaje": "",
+    "modo": "audio",
+    "video_id": "",  # para saber cuando empieza un video nuevo
+    "parte": 1,      # en "video con audio" se baja el video (parte 1) y luego el audio (parte 2)
+}
 
 
 def ver_info():
@@ -50,10 +67,113 @@ def elegir_carpeta():
         var_carpeta.set(carpeta)
 
 
+def progreso(d):
+    # yt-dlp llama a esta funcion mientras descarga (desde el hilo, no desde la ventana)
+    # solo guardamos los datos en "estado", no tocamos la ventana
+    info = d.get("info_dict", {})
+
+    # si cambio el id es que empezo otro video, volvemos a la parte 1
+    if info.get("id") != estado["video_id"]:
+        estado["video_id"] = info.get("id")
+        estado["parte"] = 1
+
+    # armamos el comienzo del texto: "Video 3 de 10 - Parte 1 de 2 - "
+    inicio = ""
+    numero = info.get("playlist_index")
+    total_videos = info.get("n_entries")
+    if numero != None and total_videos != None:
+        inicio = inicio + "Video " + str(numero) + " de " + str(total_videos) + "  -  "
+    if estado["modo"] == "video":
+        inicio = inicio + "Parte " + str(min(estado["parte"], 2)) + " de 2  -  "
+
+    if d["status"] == "downloading":
+        bajado = d.get("downloaded_bytes", 0)
+        total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
+        if total > 0:
+            estado["porcentaje"] = bajado * 100 / total
+        velocidad = d.get("speed") or 0
+        mb_s = round(velocidad / 1024 / 1024, 2)
+        estado["texto"] = inicio + str(round(estado["porcentaje"], 1)) + "%  (" + str(mb_s) + " MB/s)"
+    elif d["status"] == "finished":
+        estado["porcentaje"] = 100
+        if estado["modo"] == "video" and estado["parte"] == 1:
+            estado["texto"] = inicio + "lista, sigue el audio..."
+        else:
+            estado["texto"] = inicio + "Procesando con ffmpeg..."
+        estado["parte"] = estado["parte"] + 1
+
+
+def hilo_descarga(url, modo, carpeta, es_playlist, calidad):
+    # esto corre en otro hilo para que la ventana no se congele
+    ok, mensaje = descargar(url, modo, carpeta, es_playlist, calidad, progreso)
+    estado["resultado"] = ok
+    estado["mensaje"] = mensaje
+    estado["terminado"] = True
+
+
+def empezar_descarga():
+    url = entrada_url.get().strip()
+    if url == "":
+        messagebox.showwarning("Falta el link", "Primero pega el link del video o playlist.")
+        return
+    if not url.startswith("http"):
+        messagebox.showwarning("Link raro", "El link debe empezar con http:// o https://")
+        return
+    if var_carpeta.get().strip() == "":
+        messagebox.showwarning("Falta la carpeta", "Elige una carpeta donde guardar.")
+        return
+
+    # reiniciamos el estado
+    estado["descargando"] = True
+    estado["porcentaje"] = 0
+    estado["texto"] = "Empezando..."
+    estado["terminado"] = False
+    estado["resultado"] = False
+    estado["mensaje"] = ""
+    estado["modo"] = var_modo.get()
+    estado["video_id"] = ""
+    estado["parte"] = 1
+
+    # desactivamos el boton para que no le den dos veces
+    boton_descargar.config(state="disabled")
+    etiqueta_estado.config(fg="black")
+
+    # creamos el hilo y lo arrancamos
+    # daemon=True hace que el hilo se cierre si cierras la ventana
+    hilo = threading.Thread(
+        target=hilo_descarga,
+        args=(url, var_modo.get(), var_carpeta.get(), var_playlist.get(), var_calidad.get()),
+        daemon=True,
+    )
+    hilo.start()
+
+    revisar_progreso()
+
+
+def revisar_progreso():
+    # se llama a si misma cada 100 milisegundos mientras haya descarga
+    barra["value"] = estado["porcentaje"]
+    etiqueta_estado.config(text=estado["texto"])
+
+    if estado["terminado"]:
+        estado["descargando"] = False
+        boton_descargar.config(state="normal")
+        if estado["resultado"]:
+            barra["value"] = 100
+            etiqueta_estado.config(text="Listo!", fg="green")
+            messagebox.showinfo("Descarga terminada", "Listo!\n" + estado["mensaje"])
+        else:
+            barra["value"] = 0
+            etiqueta_estado.config(text="Hubo un error", fg="red")
+            messagebox.showerror("Error", "No se pudo descargar:\n" + estado["mensaje"])
+    else:
+        ventana.after(100, revisar_progreso)
+
+
 # ----- ventana principal -----
 ventana = tk.Tk()
 ventana.title("Descargador de YouTube")
-ventana.geometry("620x480")
+ventana.geometry("620x560")
 ventana.resizable(False, False)
 
 # variables que guardan lo que elige el usuario
@@ -100,5 +220,15 @@ marco_carpeta.pack(fill="x", padx=20, pady=5)
 entrada_carpeta = tk.Entry(marco_carpeta, textvariable=var_carpeta, width=70)
 entrada_carpeta.pack(side="left", padx=(0, 5))
 tk.Button(marco_carpeta, text="Examinar...", command=elegir_carpeta).pack(side="left")
+
+# ----- descargar y progreso -----
+boton_descargar = tk.Button(ventana, text="DESCARGAR", font=("Arial", 12, "bold"), bg="#d32f2f", fg="white", width=20, command=empezar_descarga)
+boton_descargar.pack(pady=10)
+
+barra = ttk.Progressbar(ventana, length=560, maximum=100)
+barra.pack()
+
+etiqueta_estado = tk.Label(ventana, text="", font=("Arial", 10))
+etiqueta_estado.pack(pady=5)
 
 ventana.mainloop()

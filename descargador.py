@@ -33,6 +33,29 @@ def mostrar_progreso(d):
         print("\nDescarga terminada, procesando con ffmpeg...")
 
 
+def traducir_error(error):
+    # los errores de yt-dlp vienen en ingles y muy largos
+    # aqui buscamos palabras clave para dar un mensaje entendible
+    texto = str(error)
+    t = texto.lower()  # en minusculas para que no importen las mayusculas
+    if "unsupported url" in t or "not a valid url" in t:
+        return "Ese link no es valido o no es de una pagina compatible."
+    if "private video" in t:
+        return "El video es privado."
+    if "unavailable" in t or "not available" in t:
+        return "El video no esta disponible (puede que lo hayan borrado o este bloqueado)."
+    if "404" in t:
+        return "No se encontro la pagina, revisa el link."
+    if "confirm your age" in t:
+        return "El video tiene restriccion de edad y pide iniciar sesion."
+    if "getaddrinfo" in t or "failed to resolve" in t or "timed out" in t:
+        return "No hay conexion a internet o la pagina no responde."
+    if "ffmpeg" in t:
+        return "Hubo un problema con ffmpeg. Revisa que este instalado."
+    # si no es ninguno conocido, devolvemos el error original
+    return texto.replace("ERROR: ", "")
+
+
 def descargar(url, modo="video", carpeta=None, es_playlist=False, calidad_audio="192", funcion_progreso=None):
     # url: el link del video o playlist
     # modo: "audio" (solo mp3), "video" (mp4 con audio) o "solo_video" (mp4 sin audio)
@@ -40,6 +63,9 @@ def descargar(url, modo="video", carpeta=None, es_playlist=False, calidad_audio=
     # es_playlist: True para bajar toda la playlist, False para solo un video
     # calidad_audio: kbps del mp3 ("128", "192", "320")
     # funcion_progreso: funcion que recibe el progreso (la usaremos en la interfaz)
+    #
+    # devuelve dos cosas: (True o False, mensaje)
+    # ejemplo: ok, mensaje = descargar(...)
 
     if carpeta == None or carpeta == "":
         carpeta = CARPETA_POR_DEFECTO
@@ -99,16 +125,22 @@ def descargar(url, modo="video", carpeta=None, es_playlist=False, calidad_audio=
         opciones["format"] = "bestvideo[ext=mp4]/bestvideo"
     else:
         print("Modo no valido: " + str(modo))
-        return False
+        return False, "Modo no valido: " + str(modo)
 
     try:
         with yt_dlp.YoutubeDL(opciones) as ydl:
-            ydl.download([url])
-        print("Listo! Guardado en: " + carpeta)
-        return True
+            codigo = ydl.download([url])
+        # en playlist los errores no paran la descarga, pero download() devuelve 1 si alguno fallo
+        if codigo != 0:
+            mensaje = "Se descargo, pero algunos videos fallaron (pueden ser privados o borrados)."
+        else:
+            mensaje = "Guardado en: " + carpeta
+        print("Listo! " + mensaje)
+        return True, mensaje
     except Exception as e:
-        print("\nError al descargar: " + str(e))
-        return False
+        mensaje = traducir_error(e)
+        print("\nError al descargar: " + mensaje)
+        return False, mensaje
 
 
 def obtener_info(url):
