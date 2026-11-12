@@ -51,13 +51,18 @@ def descargar(url, modo="video", carpeta=None, es_playlist=False, calidad_audio=
     if funcion_progreso == None:
         funcion_progreso = mostrar_progreso
 
+    # al solo video le ponemos "(sin audio)" para que no choque con el mp4 normal
+    extra = ""
+    if modo == "solo_video":
+        extra = " (sin audio)"
+
     # nombre de los archivos que se guardan
     if es_playlist:
         # en playlist se crea una subcarpeta con el nombre de la playlist
         # y los archivos se numeran: 01 - titulo.mp3
-        plantilla = os.path.join(carpeta, "%(playlist_title)s", "%(playlist_index)02d - %(title)s.%(ext)s")
+        plantilla = os.path.join(carpeta, "%(playlist_title)s", "%(playlist_index)02d - %(title)s" + extra + ".%(ext)s")
     else:
-        plantilla = os.path.join(carpeta, "%(title)s.%(ext)s")
+        plantilla = os.path.join(carpeta, "%(title)s" + extra + ".%(ext)s")
 
     # opciones basicas que se usan siempre
     opciones = {
@@ -67,6 +72,7 @@ def descargar(url, modo="video", carpeta=None, es_playlist=False, calidad_audio=
         "ignoreerrors": es_playlist,  # en playlist si un video falla, sigue con los demas
         "quiet": True,
         "no_warnings": True,
+        "noprogress": True,  # que yt-dlp no imprima su barra, usamos la nuestra
     }
 
     ruta_ffmpeg = buscar_ffmpeg()
