@@ -1,4 +1,4 @@
-# YT Downloader
+# Descargador de YT
 
 Descargador de videos y audio de YouTube hecho en Python con **yt-dlp** y **ffmpeg**.
 
