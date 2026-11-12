@@ -5,7 +5,42 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import threading
+import os
+import sys
+import json
 from descargador import obtener_info, descargar, CARPETA_POR_DEFECTO
+
+
+# ----- config.json para recordar la ultima carpeta -----
+# si el programa es un .exe (hecho con pyinstaller) "frozen" es True
+# y guardamos el config al lado del .exe. Si no, al lado de este archivo .py
+if getattr(sys, "frozen", False):
+    CARPETA_PROGRAMA = os.path.dirname(sys.executable)
+else:
+    CARPETA_PROGRAMA = os.path.dirname(os.path.abspath(__file__))
+ARCHIVO_CONFIG = os.path.join(CARPETA_PROGRAMA, "config.json")
+
+
+def cargar_config():
+    # lee la ultima carpeta usada, si no hay config usa Descargas
+    try:
+        with open(ARCHIVO_CONFIG, "r", encoding="utf-8") as f:
+            datos = json.load(f)
+        carpeta = datos.get("ultima_carpeta", CARPETA_POR_DEFECTO)
+        if carpeta == "":
+            carpeta = CARPETA_POR_DEFECTO
+        return carpeta
+    except Exception:
+        # no existe el archivo o esta danado
+        return CARPETA_POR_DEFECTO
+
+
+def guardar_config(carpeta):
+    try:
+        with open(ARCHIVO_CONFIG, "w", encoding="utf-8") as f:
+            json.dump({"ultima_carpeta": carpeta}, f, ensure_ascii=False, indent=4)
+    except Exception as e:
+        print("No se pudo guardar el config: " + str(e))
 
 
 # Aqui el hilo de la descarga va dejando como va todo.
@@ -64,7 +99,18 @@ def elegir_carpeta():
     carpeta = filedialog.askdirectory(initialdir=var_carpeta.get(), title="Elige donde guardar")
     # si le das a cancelar devuelve "" y no cambiamos nada
     if carpeta != "":
+        # askdirectory devuelve con "/" asi que lo pasamos a "\" de windows
+        carpeta = os.path.normpath(carpeta)
         var_carpeta.set(carpeta)
+        guardar_config(carpeta)
+
+
+def abrir_carpeta():
+    carpeta = var_carpeta.get().strip()
+    if os.path.exists(carpeta):
+        os.startfile(carpeta)  # abre el explorador de windows en esa carpeta
+    else:
+        messagebox.showwarning("No existe", "Esa carpeta todavia no existe.\nSe crea sola cuando descargues algo.")
 
 
 def progreso(d):
@@ -123,6 +169,9 @@ def empezar_descarga():
         messagebox.showwarning("Falta la carpeta", "Elige una carpeta donde guardar.")
         return
 
+    # recordamos la carpeta para la proxima vez (por si la escribieron a mano)
+    guardar_config(var_carpeta.get().strip())
+
     # reiniciamos el estado
     estado["descargando"] = True
     estado["porcentaje"] = 0
@@ -180,7 +229,7 @@ ventana.resizable(False, False)
 var_modo = tk.StringVar(value="audio")
 var_calidad = tk.StringVar(value="192")
 var_playlist = tk.BooleanVar(value=False)
-var_carpeta = tk.StringVar(value=CARPETA_POR_DEFECTO)
+var_carpeta = tk.StringVar(value=cargar_config())
 
 titulo = tk.Label(ventana, text="Descargador de YouTube", font=("Arial", 18, "bold"))
 titulo.pack(pady=10)
@@ -217,9 +266,10 @@ tk.Checkbutton(marco_modo, text="Descargar playlist completa", variable=var_play
 marco_carpeta = tk.LabelFrame(ventana, text="Carpeta donde guardar", padx=10, pady=8)
 marco_carpeta.pack(fill="x", padx=20, pady=5)
 
-entrada_carpeta = tk.Entry(marco_carpeta, textvariable=var_carpeta, width=70)
+entrada_carpeta = tk.Entry(marco_carpeta, textvariable=var_carpeta, width=58)
 entrada_carpeta.pack(side="left", padx=(0, 5))
 tk.Button(marco_carpeta, text="Examinar...", command=elegir_carpeta).pack(side="left")
+tk.Button(marco_carpeta, text="Abrir carpeta", command=abrir_carpeta).pack(side="left", padx=(5, 0))
 
 # ----- descargar y progreso -----
 boton_descargar = tk.Button(ventana, text="DESCARGAR", font=("Arial", 12, "bold"), bg="#d32f2f", fg="white", width=20, command=empezar_descarga)

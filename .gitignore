@@ -15,4 +15,12 @@ venv/
 
 # cosas del editor / sistema
 .vscode/
+
+# configuracion personal (ultima carpeta usada)
+config.json
+
+# lo que genera pyinstaller al crear el .exe
+build/
+dist/
+*.spec
 Thumbs.db
