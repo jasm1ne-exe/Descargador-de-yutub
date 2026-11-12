@@ -1,6 +1,6 @@
 # Descargador de YT
 
-Descargador de videos y audio de YouTube hecho en Python con **yt-dlp** y **ffmpeg**.
+Descargador de videos y audio de YouTube hecho en Python con **yt-dlp** y **ffmpeg**. Para uso personal :)
 
 ## Funciones
 - Descargar solo audio (mp3, calidad 128 / 192 / 320 kbps)
