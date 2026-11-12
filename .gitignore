@@ -1,0 +1,18 @@
+# archivos que genera python
+__pycache__/
+*.pyc
+
+# entornos virtuales
+venv/
+.venv/
+
+# descargas de prueba (no subirlas a github)
+*.mp3
+*.mp4
+*.m4a
+*.webm
+*.part
+
+# cosas del editor / sistema
+.vscode/
+Thumbs.db
