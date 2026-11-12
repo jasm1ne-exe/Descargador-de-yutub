@@ -6,7 +6,7 @@ __pycache__/
 venv/
 .venv/
 
-# descargas de prueba (no subirlas a github)
+# descargas de prueba 
 *.mp3
 *.mp4
 *.m4a
